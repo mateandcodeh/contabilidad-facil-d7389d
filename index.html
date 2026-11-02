@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ContaPráctica · Ajustes y hoja de trabajo</title>
+<meta name="theme-color" content="#0d1117">
+<style>
+:root{--bg: #000000;--panel: #0d0d0d;--border:#30363d;--tx: #f2f2f2;--sub: #9a9a9a;--ac: #8b5cf6;--ok:#2f9e6e;--err:#d64545;--warn:#d29922}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--tx);padding:14px;max-width:900px;margin:0 auto;font-size:15px}
+header{display:flex;align-items:center;gap:10px;padding:4px 0 14px;flex-wrap:wrap}
+h1{font-size:19px}
+.sub{font-size:12px;color:var(--sub);flex:1}
+.ico{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--ac),#6d28d9);display:flex;align-items:center;justify-content:center;font-size:18px}
+.barra{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tab{padding:9px 13px;border-radius:10px;border:1px solid var(--border);background:var(--panel);color:var(--sub);font:inherit;font-size:13px;cursor:pointer}
+.tab.on{color:#fff;background:linear-gradient(135deg,var(--ac),#6d28d9);border-color:transparent}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:14px}
+.card h2{font-size:15px;margin-bottom:4px}
+.card .d{font-size:13px;color:var(--sub);margin-bottom:12px;line-height:1.5}
+label{display:block;font-size:13px;color:var(--sub);margin:12px 0 5px}
+input[type=text],input[type=number],select{width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:#ffffff;color:#111111;font:inherit;font-size:16px}
+textarea{width:100%;padding:14px;border-radius:12px;border:1px solid var(--border);background:#ffffff;color:#111111;font:inherit;font-size:16px;min-height:64px;resize:vertical}
+input::placeholder,textarea::placeholder{color:#6e7781}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13.5px}
+th,td{border:1px solid var(--border);padding:8px;text-align:right;min-width:80px}
+th{background:#0d1117;color:var(--sub);font-weight:600;font-size:12px}
+td.l,th.l{text-align:left}
+tr.tot td{font-weight:700;background:#0d1117}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:11px 18px;border-radius:12px;border:none;background:linear-gradient(135deg,var(--ac),#6d28d9);color:#fff;font:inherit;font-size:14.5px;cursor:pointer}
+.btn.sec{background:transparent;border:1px solid var(--border);color:var(--tx)}
+.btn.pel{background:transparent;border:1px solid var(--err);color:var(--err)}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end}
+.row>div{flex:1;min-width:130px}
+.mini{padding:6px 11px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--tx);font:inherit;font-size:13px;cursor:pointer}
+.res{font-size:13.5px;background:#0d1117;border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px;line-height:1.7}
+.res b.ok{color:var(--ok)}.res b.er{color:var(--err)}.res b.wa{color:var(--warn)}
+.neg{color:var(--err)}
+.pos{color:var(--ok)}
+.reglas{background:#0d1117;border:1px solid var(--warn);border-radius:12px;padding:12px;margin-bottom:14px}
+.reglas .rt{font-size:12px;color:var(--warn);font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:6px}
+</style>
+<style id="lf-tema">html,body{background:#000000 !important;color:#f2f2f2 !important;font-family:ui-monospace,Menlo,Consolas,monospace !important;font-size:19px !important}</style></head>
+<body>
+<header>
+  <div class="ico">📒</div>
+  <div><h1>ContaPráctica</h1><span class="sub">Saldos, ajustes y hoja de trabajo de 11 columnas · todo local</span></div>
+  <button class="btn pel" id="bReset" style="flex:0 1 auto">Restablecer</button>
+</header>
+<nav class="barra" id="tabs"></nav>
+<main id="contenido"></main>
+
+<script>
+/* ================= utilidades ================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = s => { const n = parseFloat(String(s == null ? 0 : s).replace(/\./g,'').replace(',','.')); return isNaN(n) ? 0 : n; };
+const fmt = n => (Math.round(n * 100) / 100).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const RUBROS = {
+  A:  'Activo',
+  RA: 'Reguladora de activo',
+  P:  'Pasivo',
+  PN: 'Patrimonio neto',
+  RG: 'Reguladora de pasivo',
+  RN: 'Resultado negativo',
+  RP: 'Resultado positivo'
+};
+let TAB = 'saldos';
+
+/* ================= estado ================= */
+function estadoDefecto(){
+  return {
+    cuentas: [
+      { n: 'Caja', rubro: 'A', sd: 0, sa: 0 },
+      { n: 'Bancos', rubro: 'A', sd: 0, sa: 0 },
+      { n: 'Deudores', rubro: 'A', sd: 0, sa: 0 },
+      { n: 'Proveedores', rubro: 'P', sd: 0, sa: 0 },
+      { n: 'Capital', rubro: 'PN', sd: 0, sa: 0 }
+    ],
+    customs: [],        // {id, nombre, reglas}
+    rubrosExtra: {},
+    ajustes: []         // {o:'c_<id>', c, d, h, det}
+  };
+}
+let S;
+try { S = JSON.parse(localStorage.getItem('conta_v2')) || estadoDefecto(); } catch (e) { S = estadoDefecto(); }
+if (!Array.isArray(S.cuentas) || !Array.isArray(S.customs)) S = estadoDefecto();
+function guardar(){ localStorage.setItem('conta_v2', JSON.stringify(S)); }
+
+/* ================= planilla de 11 columnas ================= */
+function todosAjustes(){ return S.ajustes; }
+function planilla(){
+  const filas = S.cuentas.filter(c => c.n.trim()).map(c => ({ n: c.n.trim(), rubro: c.rubro, sd: num(c.sd), sa: num(c.sa) }));
+  // capital automático
+  const tsd = filas.reduce((a, f) => a + f.sd, 0), tsa = filas.reduce((a, f) => a + f.sa, 0);
+  const dif = tsd - tsa;
+  if (Math.abs(dif) > 0.004) filas.push({ n: 'Capital (automático)', rubro: 'PN', sd: dif < 0 ? -dif : 0, sa: dif > 0 ? dif : 0 });
+  // cuentas que aparecen solo por ajustes
+  const movs = todosAjustes();
+  const conocidas = {};
+  filas.forEach(f => conocidas[f.n.toLowerCase()] = 1);
+  movs.forEach(a => {
+    const n = String(a.c).trim();
+    if (n && !conocidas[n.toLowerCase()]) {
+      conocidas[n.toLowerCase()] = 1;
+      filas.push({ n, rubro: S.rubrosExtra[n] || '', sd: 0, sa: 0, extra: true });
+    }
+  });
+  filas.forEach(f => {
+    let mD = 0, mA = 0;
+    movs.forEach(a => { if (String(a.c).trim().toLowerCase() === f.n.toLowerCase()) { mD += num(a.d); mA += num(a.h); } });
+    f.ad = Math.round(mD * 100) / 100; f.aa = Math.round(mA * 100) / 100;
+    const s = f.sd - f.sa + f.ad - f.aa;
+    f.sad = Math.max(0, Math.round(s * 100) / 100); f.saa = Math.max(0, Math.round(-s * 100) / 100);
+  });
+  const tot = k => filas.reduce((a, f) => a + f[k], 0);
+  return { filas, tot, difSaldo: dif };
+}
+
+/* ================= barra de pestañas ================= */
+function pintarBarra(){
+  const t = [];
+  t.push('<button class="tab' + (TAB === 'saldos' ? ' on' : '') + '" data-tab="saldos">Saldos iniciales</button>');
+  S.customs.forEach(c => t.push('<button class="tab' + (TAB === 'c_' + c.id ? ' on' : '') + '" data-tab="c_' + c.id + '">📋 ' + esc(c.nombre) + '</button>'));
+  t.push('<button class="tab' + (TAB === 'planilla' ? ' on' : '') + '" data-tab="planilla">📊 Planilla</button>');
+  t.push('<button class="tab" id="bNueva">＋ Nueva pestaña</button>');
+  $('tabs').innerHTML = t.join('');
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { TAB = b.dataset.tab; pintar(); });
+  $('bNueva').onclick = () => {
+    const nombre = prompt('Nombre de la nueva pestaña (ej.: Arqueo de caja, Conciliación bancaria, Devengados…):');
+    if (!nombre || !nombre.trim()) return;
+    const id = Date.now();
+    S.customs.push({ id, nombre: nombre.trim(), reglas: '' });
+    guardar(); TAB = 'c_' + id; pintar();
+  };
+}
+
+/* ---------- saldos iniciales ---------- */
+function vistaSaldos(){
+  const rubroOpts = sel => Object.keys(RUBROS).map(r =>
+    '<option value="' + r + '"' + (sel === r ? ' selected' : '') + '>' + RUBROS[r] + '</option>').join('');
+  let filas = S.cuentas.map((c, i) =>
+    '<tr><td class="l"><textarea data-f="cn" data-i="' + i + '" rows="2" placeholder="Nombre de la cuenta">' + esc(c.n) + '</textarea></td>' +
+    '<td><select data-f="cr" data-i="' + i + '" style="font-size:14px">' + rubroOpts(c.rubro) + '</select></td>' +
+    '<td><input type="number" value="' + c.sd + '" data-f="csd" data-i="' + i + '"></td>' +
+    '<td><input type="number" value="' + c.sa + '" data-f="csa" data-i="' + i + '"></td>' +
+    '<td><button class="mini" data-del="' + i + '">✕</button></td></tr>').join('');
+  $('contenido').innerHTML =
+    '<div class="card"><h2>Saldos iniciales</h2>' +
+    '<div class="d">Volcá los saldos de cada cuenta con su rubro. Las reguladoras restan: <b>Reg. de activo</b> (ej.: depreciación acumulada, provisión incobrables) descuenta en la columna Activo; <b>Reg. de pasivo</b> descuenta en Pasivo+PN. Si Activos ≠ Pasivo+PN+PN, la planilla crea <b>Capital (automático)</b> con la diferencia.</div>' +
+    '<table><tr><th class="l" style="min-width:190px">Cuenta</th><th class="l" style="min-width:150px">Rubro</th><th>Saldo deudor</th><th>Saldo acreedor</th><th></th></tr>' +
+    filas + '</table>' +
+    '<div style="margin-top:12px"><button class="btn sec" id="bAddC">＋ Agregar cuenta</button></div></div>';
+  $('bAddC').onclick = () => { S.cuentas.push({ n: '', rubro: 'A', sd: 0, sa: 0 }); guardar(); pintar(); };
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => { S.cuentas.splice(+b.dataset.del, 1); guardar(); pintar(); });
+  document.querySelectorAll('[data-f]').forEach(el => el.onchange = () => {
+    const i = +el.dataset.i, v = el.value;
+    if (el.dataset.f === 'cn') S.cuentas[i].n = v;
+    if (el.dataset.f === 'cr') S.cuentas[i].rubro = v;
+    if (el.dataset.f === 'csd') S.cuentas[i].sd = num(v);
+    if (el.dataset.f === 'csa') S.cuentas[i].sa = num(v);
+    guardar();
+  });
+}
+
+/* ---------- pestañas personalizadas (con "mis reglas") ---------- */
+function vistaCustom(cid){
+  const cta = S.customs.find(c => c.id === cid);
+  if (!cta) { TAB = 'saldos'; pintar(); return; }
+  const prefijo = 'c_' + cid;
+  const aj = S.ajustes.map((a, idx) => ({ ref: a, idx })).filter(x => x.ref.o === prefijo);
+  const filas = aj.map((x, i) =>
+    '<tr><td class="l"><textarea data-f="xc" data-i="' + i + '" rows="2" placeholder="Cuenta (ej.: Faltante de caja)">' + esc(x.ref.c) + '</textarea></td>' +
+    '<td><input type="number" value="' + x.ref.d + '" data-f="xd" data-i="' + i + '" placeholder="Debe"></td>' +
+    '<td><input type="number" value="' + x.ref.h + '" data-f="xh" data-i="' + i + '" placeholder="Haber"></td>' +
+    '<td class="l"><textarea data-f="xt" data-i="' + i + '" rows="2" placeholder="Detalle del ajuste">' + esc(x.ref.det || '') + '</textarea></td>' +
+    '<td><button class="mini" data-del="' + i + '">✕</button></td></tr>').join('');
+  const tD = aj.reduce((a, x) => a + num(x.ref.d), 0), tH = aj.reduce((a, x) => a + num(x.ref.h), 0);
+  $('contenido').innerHTML =
+    '<div class="card"><h2>📋 ' + esc(cta.nombre) + '</h2>' +
+    '<div class="d">Ajustes manuales de esta pestaña: escribí la cuenta afectada y el importe en Debe o en Haber (la otra en 0). Todo se vuelca solo a la planilla.</div>' +
+    '<div class="reglas"><div class="rt">🧠 Mis reglas — cómo trabaja esta pestaña</div>' +
+    '<textarea id="reglas" rows="4" placeholder="Escribí acá qué hace esta pestaña y cómo usarla, ej.: Arqueo de caja → ingresar efectivo contado e ítems sin registrar (gastos o ítems a cobrar); la diferencia contra el saldo de Caja es faltante o sobrante, y cada ítem genera su asiento.">' + esc(cta.reglas || '') + '</textarea></div>' +
+    '<table><tr><th class="l" style="min-width:190px">Cuenta</th><th>Debe</th><th>Haber</th><th class="l" style="min-width:160px">Detalle</th><th></th></tr>' +
+    filas +
+    (aj.length ? '<tr class="tot"><td class="l">Sumas</td><td>' + fmt(tD) + '</td><td>' + fmt(tH) + '</td><td class="l">' +
+      (Math.abs(tD - tH) < 0.005 ? '<span class="pos">✓ Cuadra</span>' : '<span class="neg">✗ Descuadre: ' + fmt(Math.abs(tD - tH)) + '</span>') + '</td><td></td></tr>' : '') +
+    '</table>' +
+    '<div style="margin-top:12px" class="row">' +
+    '<button class="btn sec" id="bAddX">＋ Línea de ajuste</button>' +
+    '<button class="btn pel" id="bDelTab" style="flex:0 1 auto">🗑 Eliminar pestaña</button></div></div>';
+  $('reglas').onchange = e => { cta.reglas = e.target.value; guardar(); };
+  $('bAddX').onclick = () => { S.ajustes.push({ o: prefijo, c: '', d: 0, h: 0, det: '' }); guardar(); pintar(); };
+  $('bDelTab').onclick = () => {
+    if (!confirm('¿Eliminar la pestaña "' + cta.nombre + '" y sus ajustes?')) return;
+    S.ajustes = S.ajustes.filter(a => a.o !== prefijo);
+    S.customs = S.customs.filter(c => c.id !== cid);
+    guardar(); TAB = 'saldos'; pintar();
+  };
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    S.ajustes.splice(aj[+b.dataset.del].idx, 1); guardar(); pintar();
+  });
+  document.querySelectorAll('[data-f]').forEach(el => el.onchange = () => {
+    const a = aj[+el.dataset.i].ref;
+    if (el.dataset.f === 'xc') a.c = el.value;
+    if (el.dataset.f === 'xd') a.d = num(el.value);
+    if (el.dataset.f === 'xh') a.h = num(el.value);
+    if (el.dataset.f === 'xt') a.det = el.value;
+    guardar();
+  });
+}
+
+/* ---------- planilla ---------- */
+function vistaPlanilla(){
+  const P = planilla();
+  const f = P.filas;
+  const t = P.tot;
+  function colA(x){ return (x.rubro === 'A' || x.rubro === 'RA') ? x.sad - x.saa : null; }
+  function colPPN(x){ if (x.rubro === 'P' || x.rubro === 'PN') return x.saa - x.sad; if (x.rubro === 'RG') return x.sad - x.saa; return null; }
+  function colRN(x){ return x.rubro === 'RN' ? x.sad - x.saa : null; }
+  function colRP(x){ return x.rubro === 'RP' ? x.saa - x.sad : null; }
+  const cel = v => v === null || Math.abs(v) < 0.005 ? '' : fmt(v);
+  const cls = v => v === null ? '' : (v > 0 ? 'pos' : v < 0 ? 'neg' : '');
+  let sinRubro = 0;
+  const rubroOpts = sel => '<option value="">(elegir rubro)</option>' + Object.keys(RUBROS).map(r =>
+    '<option value="' + r + '"' + (sel === r ? ' selected' : '') + '>' + RUBROS[r] + '</option>').join('');
+  const filas = f.map((x, i) => {
+    if (x.extra && !x.rubro) sinRubro++;
+    return '<tr><td class="l">' + esc(x.n) +
+      (x.extra ? ' <span style="color:var(--warn);font-size:11px">(por ajuste)</span> <select data-rub="' + i + '" style="font-size:13px;padding:6px">' + rubroOpts(x.rubro) + '</select>' : '') +
+      '</td>' +
+      '<td>' + (x.sd ? fmt(x.sd) : '') + '</td><td>' + (x.sa ? fmt(x.sa) : '') + '</td>' +
+      '<td>' + (x.ad ? fmt(x.ad) : '') + '</td><td>' + (x.aa ? fmt(x.aa) : '') + '</td>' +
+      '<td>' + (x.sad ? fmt(x.sad) : '') + '</td><td>' + (x.saa ? fmt(x.saa) : '') + '</td>' +
+      '<td class="' + cls(colA(x)) + '">' + cel(colA(x)) + '</td>' +
+      '<td class="' + cls(colPPN(x)) + '">' + cel(colPPN(x)) + '</td>' +
+      '<td class="' + cls(colRN(x)) + '">' + cel(colRN(x)) + '</td>' +
+      '<td class="' + cls(colRP(x)) + '">' + cel(colRP(x)) + '</td></tr>';
+  }).join('');
+  const totA = f.reduce((a, x) => a + (colA(x) || 0), 0);
+  const totPPN = f.reduce((a, x) => a + (colPPN(x) || 0), 0);
+  const totRN = f.reduce((a, x) => a + (colRN(x) || 0), 0);
+  const totRP = f.reduce((a, x) => a + (colRP(x) || 0), 0);
+  const totalRow = '<tr class="tot"><td class="l">SUMAS</td>' +
+    '<td>' + fmt(t('sd')) + '</td><td>' + fmt(t('sa')) + '</td>' +
+    '<td>' + fmt(t('ad')) + '</td><td>' + fmt(t('aa')) + '</td>' +
+    '<td>' + fmt(t('sad')) + '</td><td>' + fmt(t('saa')) + '</td>' +
+    '<td>' + fmt(totA) + '</td><td>' + fmt(totPPN) + '</td>' +
+    '<td>' + fmt(totRN) + '</td><td>' + fmt(totRP) + '</td></tr>';
+  const cuadraSaldos = Math.abs(t('sd') - t('sa')) < 0.005;
+  const cuadraAj = Math.abs(t('sad') - t('saa')) < 0.005;
+  const resultado = totRP - totRN;
+  const difEc = totA + totRN - totPPN - totRP;
+  $('contenido').innerHTML =
+    '<div class="card"><h2>Planilla de 11 columnas</h2>' +
+    '<div class="d">Se vuelcan automáticamente: saldos iniciales, todos los ajustes de tus pestañas, saldos ajustados y la clasificación por rubro (las reguladoras descuentan dentro de su columna).</div>' +
+    '<div style="overflow-x:auto"><table><tr><th class="l">Cuentas</th>' +
+    '<th>Saldos deudor</th><th>Saldos acreedor</th><th>Ajustes deudor</th><th>Ajustes acreedor</th>' +
+    '<th>Saldo aj. deudor</th><th>Saldo aj. acreedor</th><th>Activo</th><th>Pasivo + PN</th><th>Result. negativo</th><th>Result. positivo</th></tr>' +
+    filas + totalRow + '</table></div>' +
+    '<div class="res">' +
+    'Sumas de saldos: ' + (cuadraSaldos ? '<b class="ok">cuadran ✓</b>' : '<b class="er">NO cuadran (' + fmt(t('sd')) + ' vs ' + fmt(t('sa')) + ')</b>') + '<br>' +
+    'Sumas de saldos ajustados: ' + (cuadraAj ? '<b class="ok">cuadran ✓</b>' : '<b class="er">NO cuadran (' + fmt(t('sad')) + ' vs ' + fmt(t('saa')) + ')</b>') + '<br>' +
+    'Activo neto: <b>' + fmt(totA) + '</b> · Pasivo+PN: <b>' + fmt(totPPN) + '</b> · Resultado del ejercicio (RP − RN): <b class="' + (resultado >= 0 ? 'ok' : 'er') + '">' + fmt(resultado) + '</b>' +
+    (sinRubro ? '<br><b class="wa">' + sinRubro + ' cuenta(s) creadas por ajustes sin rubro — asignales su rubro en la tabla para completar la clasificación.</b>' : '') +
+    (Math.abs(difEc) < 0.005
+      ? '<br><b class="ok">La ecuación A + RN = P + PN + RP cuadra ✓</b>'
+      : '<br><b class="er">La ecuación no cuadra por ' + fmt(Math.abs(difEc)) + '</b> — revisá los rubros asignados') +
+    '</div>' +
+    '<div style="margin-top:12px"><button class="btn sec" id="bCsv">⬇️ Exportar planilla (CSV)</button></div></div>';
+  document.querySelectorAll('[data-rub]').forEach(el => el.onchange = () => {
+    const fil = P.filas[+el.dataset.rub];
+    if (el.value) S.rubrosExtra[fil.n] = el.value;
+    else delete S.rubrosExtra[fil.n];
+    guardar(); pintar();
+  });
+  $('bCsv').onclick = () => {
+    const lineas = [['Cuentas','Saldos deudor','Saldos acreedor','Ajustes deudor','Ajustes acreedor','Saldo aj. deudor','Saldo aj. acreedor','Activo','Pasivo + PN','Resultado negativo','Resultado positivo']];
+    f.forEach(x => lineas.push([x.n, x.sd, x.sa, x.ad, x.aa, x.sad, x.saa,
+      colA(x) === null ? '' : colA(x), colPPN(x) === null ? '' : colPPN(x),
+      colRN(x) === null ? '' : colRN(x), colRP(x) === null ? '' : colRP(x)]));
+    lineas.push(['SUMAS', t('sd'), t('sa'), t('ad'), t('aa'), t('sad'), t('saa'), totA, totPPN, totRN, totRP]);
+    const csv = lineas.map(l => l.join(';')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv' });
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = u; a.download = 'planilla.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 5000);
+  };
+}
+
+/* ================= router ================= */
+function pintar(){
+  pintarBarra();
+  if (TAB === 'saldos') vistaSaldos();
+  else if (TAB === 'planilla') vistaPlanilla();
+  else if (TAB.indexOf('c_') === 0) vistaCustom(+TAB.slice(2));
+}
+$('bReset').onclick = () => {
+  if (!confirm('¿Borrar TODO (cuentas, ajustes y pestañas)?')) return;
+  localStorage.removeItem('conta_v2');
+  S = estadoDefecto(); TAB = 'saldos'; pintar();
+};
+pintar();
+</script>
+</body>
+</html>
